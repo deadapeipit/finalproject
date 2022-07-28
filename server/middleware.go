@@ -49,14 +49,14 @@ func SecureMiddleware(next http.Handler) http.Handler {
 		if err != nil {
 			e, ok := err.(*jwt.ValidationError)
 			if !ok || ok && e.Errors&jwt.ValidationErrorIssuedAt == 0 { // Don't report error that token used before issued.
-				WriteJsonResp(w, ErrorBadRequest, "BAD_REQUEST")
+				WriteJsonResp(w, ErrorBadRequest, "BAD REQUEST")
 				return
 			}
 		}
 
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok { //|| !token.Valid {
-			WriteJsonResp(w, ErrorBadRequest, "BAD_REQUEST")
+			WriteJsonResp(w, ErrorBadRequest, "BAD REQUEST")
 			return
 		}
 
@@ -71,7 +71,7 @@ func SecureMiddleware(next http.Handler) http.Handler {
 		}
 		//Set logonuser
 		LogonUser = l
-		fmt.Println(uid)
+		//fmt.Println(uid)
 
 		next.ServeHTTP(w, r)
 	})

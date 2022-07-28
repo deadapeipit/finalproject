@@ -4,16 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"finalproject/entity"
+	"strings"
 	"time"
 )
 
 func (s *Database) PostSocialMedia(ctx context.Context, userid int64, i entity.SocialMediaPost) (*entity.SocialMedia, error) {
 	result := &entity.SocialMedia{}
-	qry := "insert into socialmedias (name, socialmediaurl, userid, createdat, updatedat) values (@name, @socialmediaurl, @userid, @createdat, @updatedat); select id, name, socialmediaurl, userid, createdat,updatedat from socialmedias"
+	qry := "insert into socialmedias (name, socialmediaurl, profileimageurl, userid, createdat, updatedat) values (@name, @socialmediaurl, @profileimageurl, @userid, @createdat, @updatedat); select id, name, socialmediaurl, profileimageurl, userid, createdat,updatedat from socialmedias"
 	now := time.Now()
 	rows, err := s.SqlDb.QueryContext(ctx, qry,
 		sql.Named("name", i.Name),
-		sql.Named("socialmediaurl", i.SocialMediaUrl),
+		sql.Named("socialmediaurl", i.SocialMediaURL),
+		sql.Named("profileimageurl", i.ProfileImageURL),
 		sql.Named("userid", userid),
 		sql.Named("createdat", now),
 		sql.Named("updatedat", now))
@@ -25,7 +27,8 @@ func (s *Database) PostSocialMedia(ctx context.Context, userid int64, i entity.S
 		err := rows.Scan(
 			&result.ID,
 			&result.Name,
-			&result.SocialMediaUrl,
+			&result.SocialMediaURL,
+			&result.ProfileImageURL,
 			&result.UserID,
 			&result.CreatedAt,
 			&result.UpdatedAt,
@@ -38,28 +41,33 @@ func (s *Database) PostSocialMedia(ctx context.Context, userid int64, i entity.S
 	return result, nil
 }
 
-func (s *Database) GetSocialMedias(ctx context.Context, userid int64) ([]entity.SocialMedia, error) {
-	var result []entity.SocialMedia
-	qry := "select id, name, socialmediaurl, userid, createdat, updatedat from socialmedias where userid=@userid"
-	rows, err := s.SqlDb.QueryContext(ctx, qry,
-		sql.Named("userid", userid))
+func (s *Database) GetSocialMedias(ctx context.Context) ([]entity.SocialMediaGetOutput, error) {
+	var result []entity.SocialMediaGetOutput
+	var qry strings.Builder
+	qry.WriteString("select s.id, s.name, s.socialmediaurl, s.userid, s.createdat, s.updatedat,")
+	qry.WriteString(" u.username, s.profileimageurl")
+	qry.WriteString(" from socialmedias s join users u on s.userid=u.id")
+	rows, err := s.SqlDb.QueryContext(ctx, qry.String())
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var row entity.SocialMedia
+		var row entity.SocialMediaGetOutput
 		err := rows.Scan(
 			&row.ID,
 			&row.Name,
-			&row.SocialMediaUrl,
+			&row.SocialMediaURL,
 			&row.UserID,
 			&row.CreatedAt,
 			&row.UpdatedAt,
+			&row.User.Username,
+			&row.User.ProfileImageURL,
 		)
 		if err != nil {
 			return nil, err
 		}
+		row.User.ID = row.UserID
 		result = append(result, row)
 	}
 	return result, nil
@@ -78,7 +86,7 @@ func (s *Database) GetSocialMediaByID(ctx context.Context, id int64) (*entity.So
 		err := rows.Scan(
 			&result.ID,
 			&result.Name,
-			&result.SocialMediaUrl,
+			&result.SocialMediaURL,
 			&result.UserID,
 			&result.CreatedAt,
 			&result.UpdatedAt,
@@ -90,13 +98,14 @@ func (s *Database) GetSocialMediaByID(ctx context.Context, id int64) (*entity.So
 	return result, nil
 }
 
-func (s *Database) UpdateSocialMedia(ctx context.Context, userid int64, id int64, name string, socialmediaurl string) (*entity.SocialMedia, error) {
+func (s *Database) UpdateSocialMedia(ctx context.Context, userid int64, id int64, i entity.SocialMediaPost) (*entity.SocialMedia, error) {
 	result := &entity.SocialMedia{}
 	now := time.Now()
-	qry := "update socialmedias set name=@name, socialmediaurl=@socialmediaurl, updatedat=@updatedat where id = @ID; select id, name, socialmediaurl, userid, updatedat from socialmedias where id = @ID"
+	qry := "update socialmedias set name=@name, socialmediaurl=@socialmediaurl, profileimageurl=@profileimageurl, updatedat=@updatedat where id = @ID; select id, name, socialmediaurl, profileimageurl, userid, updatedat from socialmedias where id = @ID"
 	rows, err := s.SqlDb.QueryContext(ctx, qry,
-		sql.Named("name", name),
-		sql.Named("socialmediaurl", socialmediaurl),
+		sql.Named("name", i.Name),
+		sql.Named("socialmediaurl", i.SocialMediaURL),
+		sql.Named("profileimageurl", i.ProfileImageURL),
 		sql.Named("updatedat", now),
 		sql.Named("userid", userid),
 		sql.Named("ID", id))
@@ -108,7 +117,8 @@ func (s *Database) UpdateSocialMedia(ctx context.Context, userid int64, id int64
 		err := rows.Scan(
 			&result.ID,
 			&result.Name,
-			&result.SocialMediaUrl,
+			&result.SocialMediaURL,
+			&result.ProfileImageURL,
 			&result.UserID,
 			&result.UpdatedAt,
 		)

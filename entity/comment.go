@@ -12,12 +12,12 @@ type Comment struct {
 }
 
 type CommentPost struct {
-	PhotoID int    `json:"photo_id"`
-	Message string `json:"message"`
+	PhotoID int    `json:"photo_id" validate:"required"`
+	Message string `json:"message" validate:"required"`
 }
 
 type CommentUpdate struct {
-	Message string `json:"message"`
+	Message string `json:"message" validate:"required"`
 }
 
 type CommentPostOutput struct {

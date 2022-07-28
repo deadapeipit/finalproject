@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"finalproject/entity"
+	"strings"
 	"time"
 )
 
@@ -38,16 +39,22 @@ func (s *Database) PostComment(ctx context.Context, userid int64, i entity.Comme
 	return result, nil
 }
 
-func (s *Database) GetComments(ctx context.Context) ([]entity.Comment, error) {
-	var result []entity.Comment
-	qry := "select id, message, photoid, userid, createdat, updatedat from comments"
-	rows, err := s.SqlDb.QueryContext(ctx, qry)
+func (s *Database) GetComments(ctx context.Context) ([]entity.CommentGetOutput, error) {
+	var result []entity.CommentGetOutput
+	var qry strings.Builder
+	qry.WriteString("select c.id, c.message, c.photoid, c.userid, c.createdat, c.updatedat,")
+	qry.WriteString(" p.title, p.caption, p.photourl,")
+	qry.WriteString(" u.email, u.username from comments c")
+	qry.WriteString(" join photos p on c.photoid=p.id")
+	qry.WriteString(" join users u on c.userid=u.id")
+
+	rows, err := s.SqlDb.QueryContext(ctx, qry.String())
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var row entity.Comment
+		var row entity.CommentGetOutput
 		err := rows.Scan(
 			&row.ID,
 			&row.Message,
@@ -55,10 +62,18 @@ func (s *Database) GetComments(ctx context.Context) ([]entity.Comment, error) {
 			&row.UserID,
 			&row.CreatedAt,
 			&row.UpdatedAt,
+			&row.Photo.Title,
+			&row.Photo.Caption,
+			&row.Photo.PhotoUrl,
+			&row.User.Email,
+			&row.User.Username,
 		)
 		if err != nil {
 			return nil, err
 		}
+		row.User.ID = row.UserID
+		row.Photo.UserID = row.UserID
+		row.Photo.ID = row.PhotoID
 		result = append(result, row)
 	}
 	return result, nil

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
 )
 
@@ -57,28 +58,10 @@ func (h *CommentHandler) CommentsHandler(w http.ResponseWriter, r *http.Request)
 func getCommentsHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 
-	c, err := database.SqlDatabase.GetComments(ctx)
+	retVal, err := database.SqlDatabase.GetComments(ctx)
 	if err != nil {
 		s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
 		return
-	}
-
-	retVal := []entity.CommentGetOutput{}
-	for _, i := range c {
-		var tempout entity.CommentGetOutput
-		p, err := database.SqlDatabase.GetPhotoByID(ctx, int64(i.PhotoID))
-		if err != nil {
-			s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
-			return
-		}
-		tempout.Comment = i
-		tempout.User = entity.UserGetComment{
-			ID:       s.LogonUser.ID,
-			Email:    s.LogonUser.Email,
-			Username: s.LogonUser.Username,
-		}
-		tempout.Photo = *p.ToPhotoGetComment()
-		retVal = append(retVal, tempout)
 	}
 
 	s.WriteJsonResp(w, s.Success, retVal)
@@ -131,11 +114,17 @@ func getCommentsByPhotoIDHandler(w http.ResponseWriter, r *http.Request, id stri
 // }
 func postCommentHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
+	validate := validator.New()
 	decoder := json.NewDecoder(r.Body)
 	var inp entity.CommentPost
 
 	if err := decoder.Decode(&inp); err != nil {
 		s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
+		return
+	}
+	err := validate.Struct(inp)
+	if err != nil {
+		s.WriteJsonResp(w, s.ErrorBadRequest, err.Error())
 		return
 	}
 	c, err := database.SqlDatabase.PostComment(ctx, s.LogonUser.ID, inp)
@@ -161,9 +150,14 @@ func updateCommentHandler(w http.ResponseWriter, r *http.Request, id string) {
 
 	if id != "" { // get by id
 		if idInt, err := strconv.ParseInt(id, 10, 64); err == nil {
+			validate := validator.New()
 			decoder := json.NewDecoder(r.Body)
 			var inp entity.CommentUpdate
-
+			err := validate.Struct(inp)
+			if err != nil {
+				s.WriteJsonResp(w, s.ErrorBadRequest, err.Error())
+				return
+			}
 			c, err := database.SqlDatabase.GetCommentByID(ctx, idInt)
 			if err != nil {
 				s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"finalproject/entity"
+	"strings"
 	"time"
 )
 
@@ -40,16 +41,18 @@ func (s *Database) PostPhoto(ctx context.Context, u int64, i entity.PhotoPost) (
 	return result, nil
 }
 
-func (s *Database) GetPhotos(ctx context.Context) ([]entity.Photo, error) {
-	var result []entity.Photo
-	qry := "select id, title, caption, photourl, userid, createdat, updatedat from photos"
-	rows, err := s.SqlDb.QueryContext(ctx, qry)
+func (s *Database) GetPhotos(ctx context.Context) ([]entity.PhotoGetOutput, error) {
+	var result []entity.PhotoGetOutput
+	var qry strings.Builder
+	qry.WriteString("select p.id, p.title, p.caption, p.photourl, p.userid, p.createdat, p.updatedat, u.email, u.password from photos p")
+	qry.WriteString(" join users u on p.userid=u.id")
+	rows, err := s.SqlDb.QueryContext(ctx, qry.String())
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var row entity.Photo
+		var row entity.PhotoGetOutput
 		err := rows.Scan(
 			&row.ID,
 			&row.Title,
@@ -58,6 +61,8 @@ func (s *Database) GetPhotos(ctx context.Context) ([]entity.Photo, error) {
 			&row.UserID,
 			&row.CreatedAt,
 			&row.UpdatedAt,
+			&row.User.Email,
+			&row.User.Username,
 		)
 		if err != nil {
 			return nil, err

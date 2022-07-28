@@ -32,9 +32,9 @@ func (p *Photo) ToPhotoGetComment() *PhotoGetComment {
 }
 
 type PhotoPost struct {
-	Title    string `json:"title"`
+	Title    string `json:"title" validate:"required"`
 	Caption  string `json:"caption"`
-	PhotoUrl string `json:"photo_url"`
+	PhotoUrl string `json:"photo_url" validate:"required"`
 }
 
 type PhotoPostOutput struct {

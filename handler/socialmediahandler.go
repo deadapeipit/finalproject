@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
 )
 
@@ -53,23 +54,12 @@ func (h *SocialMediaHandler) SocialMediasHandler(w http.ResponseWriter, r *http.
 func getSocialMediasHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 
-	c, err := database.SqlDatabase.GetSocialMedias(ctx, s.LogonUser.ID)
+	retVal, err := database.SqlDatabase.GetSocialMedias(ctx)
 	if err != nil {
 		s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
 		return
 	}
 
-	retVal := []entity.SocialMediaGetOutput{}
-	for _, i := range c {
-		var tempout entity.SocialMediaGetOutput
-		tempout.SocialMedia = i
-		tempout.User = entity.UserGetComment{
-			ID:       s.LogonUser.ID,
-			Email:    s.LogonUser.Email,
-			Username: s.LogonUser.Username,
-		}
-		retVal = append(retVal, tempout)
-	}
 	s.WriteJsonResp(w, s.Success, retVal)
 }
 
@@ -79,14 +69,21 @@ func getSocialMediasHandler(w http.ResponseWriter, r *http.Request) {
 // JSON Body:
 // {
 // 	"name": "social media name",
-// 	"social_media_url": "https://domainsocialmedia.com/user"
+// 	"social_media_url": "https://domainsocialmedia.com/user",
+// 	"profile_image_url": "https://domainsocialmedia.com/userimage.jpg"
 // }
 func postSocialMediaHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
+	validate := validator.New()
 	decoder := json.NewDecoder(r.Body)
 	var inp entity.SocialMediaPost
 	if err := decoder.Decode(&inp); err != nil {
 		s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
+		return
+	}
+	err := validate.Struct(inp)
+	if err != nil {
+		s.WriteJsonResp(w, s.ErrorBadRequest, err.Error())
 		return
 	}
 	p, err := database.SqlDatabase.PostSocialMedia(ctx, s.LogonUser.ID, inp)
@@ -106,15 +103,22 @@ func postSocialMediaHandler(w http.ResponseWriter, r *http.Request) {
 // JSON Body:
 // {
 // 	"name": "social media name",
-// 	"social_media_url": "https://domainsocialmedia.com/user"
+// 	"social_media_url": "https://domainsocialmedia.com/user",
+// 	"profile_image_url": "https://domainsocialmedia.com/userimage.jpg"
 // }
 func updateSocialMediaHandler(w http.ResponseWriter, r *http.Request, id string) {
 	ctx := context.Background()
 
 	if id != "" { // get by id
 		if idInt, err := strconv.ParseInt(id, 10, 64); err == nil {
+			validate := validator.New()
 			decoder := json.NewDecoder(r.Body)
 			var inp entity.SocialMediaPost
+			err := validate.Struct(inp)
+			if err != nil {
+				s.WriteJsonResp(w, s.ErrorBadRequest, err.Error())
+				return
+			}
 			c, err := database.SqlDatabase.GetSocialMediaByID(ctx, idInt)
 			if err != nil {
 				s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
@@ -128,7 +132,7 @@ func updateSocialMediaHandler(w http.ResponseWriter, r *http.Request, id string)
 				s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
 				return
 			}
-			p, err := database.SqlDatabase.UpdateSocialMedia(ctx, s.LogonUser.ID, idInt, inp.Name, inp.SocialMediaUrl)
+			p, err := database.SqlDatabase.UpdateSocialMedia(ctx, s.LogonUser.ID, idInt, inp)
 			if err != nil {
 				s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
 				return

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/bcrypt"
@@ -64,6 +65,7 @@ func (h *UserHandler) UsersHandler(w http.ResponseWriter, r *http.Request) {
 // }
 func loginUserHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
+
 	decoder := json.NewDecoder(r.Body)
 	var inp entity.UserLogin
 	if err := decoder.Decode(&inp); err != nil {
@@ -115,10 +117,16 @@ func loginUserHandler(w http.ResponseWriter, r *http.Request) {
 // }
 func registerUsersHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
+	validate := validator.New()
 	decoder := json.NewDecoder(r.Body)
 	var inp entity.UserRegister
 	if err := decoder.Decode(&inp); err != nil {
 		s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
+		return
+	}
+	err := validate.Struct(inp)
+	if err != nil {
+		s.WriteJsonResp(w, s.ErrorBadRequest, err.Error())
 		return
 	}
 
@@ -151,9 +159,15 @@ func updateUserHandler(w http.ResponseWriter, r *http.Request, id string) {
 	if id != "" { // get by id
 		if idInt, err := strconv.ParseInt(id, 10, 64); err == nil {
 			decoder := json.NewDecoder(r.Body)
+			validate := validator.New()
 			var inp entity.UserUpdate
 			if err := decoder.Decode(&inp); err != nil {
 				s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
+				return
+			}
+			err := validate.Struct(inp)
+			if err != nil {
+				s.WriteJsonResp(w, s.ErrorBadRequest, err.Error())
 				return
 			}
 			if idInt != s.LogonUser.ID {

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
 )
 
@@ -59,20 +60,10 @@ func (h *PhotoHandler) PhotosHandler(w http.ResponseWriter, r *http.Request) {
 func getPhotosHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 
-	ret, err := database.SqlDatabase.GetPhotos(ctx)
+	retVal, err := database.SqlDatabase.GetPhotos(ctx)
 	if err != nil {
 		s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
 		return
-	}
-	retVal := []entity.PhotoGetOutput{}
-	for _, i := range ret {
-		var tempout entity.PhotoGetOutput
-		tempout.Photo = i
-		tempout.User = entity.UserUpdate{
-			Email:    s.LogonUser.Email,
-			Username: s.LogonUser.Username,
-		}
-		retVal = append(retVal, tempout)
 	}
 
 	s.WriteJsonResp(w, s.Success, retVal)
@@ -143,10 +134,16 @@ func getPhotosByUserIDHandler(w http.ResponseWriter, r *http.Request, id string)
 // }
 func postPhotoHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
+	validate := validator.New()
 	decoder := json.NewDecoder(r.Body)
 	var inp entity.PhotoPost
 	if err := decoder.Decode(&inp); err != nil {
 		s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
+		return
+	}
+	err := validate.Struct(inp)
+	if err != nil {
+		s.WriteJsonResp(w, s.ErrorBadRequest, err.Error())
 		return
 	}
 	p, err := database.SqlDatabase.PostPhoto(ctx, s.LogonUser.ID, inp)
@@ -173,13 +170,20 @@ func updatePhotoHandler(w http.ResponseWriter, r *http.Request, id string) {
 
 	if id != "" { // get by id
 		if idInt, err := strconv.ParseInt(id, 10, 64); err == nil {
+			validate := validator.New()
 			decoder := json.NewDecoder(r.Body)
 			var inp entity.PhotoPost
+			err := validate.Struct(inp)
+			if err != nil {
+				s.WriteJsonResp(w, s.ErrorBadRequest, err.Error())
+				return
+			}
 			c, err := database.SqlDatabase.GetPhotoByID(ctx, idInt)
 			if err != nil {
 				s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
 				return
 			}
+
 			if c.UserID != s.LogonUser.ID {
 				s.WriteJsonResp(w, s.ErrorUnauthorized, "UNAUTHORIZED")
 				return
