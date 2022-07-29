@@ -13,9 +13,9 @@ type SocialMedia struct {
 }
 
 type SocialMediaPost struct {
-	Name            string  `json:"name" validate:"required"`
-	SocialMediaURL  string  `json:"social_media_url" validate:"required"`
-	ProfileImageURL *string `json:"profile_image_url"`
+	Name            string `json:"name" validate:"required"`
+	SocialMediaURL  string `json:"social_media_url" validate:"required"`
+	ProfileImageURL string `json:"profile_image_url"`
 }
 
 type SocialMediaPostOutput struct {

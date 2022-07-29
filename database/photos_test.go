@@ -2,180 +2,290 @@ package database
 
 import (
 	"context"
+	"errors"
 	"finalproject/entity"
-	"reflect"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDatabase_PostPhoto(t *testing.T) {
-	type args struct {
-		ctx context.Context
-		u   int64
-		i   entity.PhotoPost
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	db, mock := NewMock()
+	defer db.Close()
+	dbtes := Database{
+		SqlDb: db,
 	}
-	tests := []struct {
-		name    string
-		s       *Database
-		args    args
-		want    *entity.Photo
-		wantErr bool
-	}{
-		// TODO: Add test cases.
+	qry := "insert into photos (title, caption, photourl, userid, createdat, updatedat) values (@title, @caption, @photourl, @userid, @createdat, @updatedat); select id, title, caption, photourl, userid, createdat from photos where id = SCOPE_IDENTITY()"
+
+	inp := entity.PhotoPost{
+		Title:    "Foto Kopi",
+		Caption:  "Foto kopi doang beneran",
+		PhotoUrl: "https://imageurl.com/fotokopi.jpg",
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.PostPhoto(tt.args.ctx, tt.args.u, tt.args.i)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Database.PostPhoto() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Database.PostPhoto() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+
+	t.Run("postphoto database down", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), inp).
+			WillReturnError(errors.New("db down"))
+		out, err := dbtes.PostPhoto(ctx, int64(1), inp)
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "db down", err.Error())
+	})
+
+	t.Run("postphoto required userid", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), inp).
+			WillReturnError(errors.New("required userid"))
+		out, err := dbtes.PostPhoto(ctx, int64(0), inp)
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required userid", err.Error())
+	})
+
+	t.Run("postphoto success", func(t *testing.T) {
+		rows := mock.NewRows([]string{"id", "title", "caption", "photourl", "userid", "createdat"}).
+			AddRow(1, "Foto Kopi", "Foto kopi doang beneran", "http://imageurl.com/fotokopi.jpg", 1, time.Now())
+
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), inp).
+			WillReturnRows(rows)
+		out, err := dbtes.PostPhoto(ctx, int64(1), inp)
+		assert.NotNil(t, out)
+		assert.NoError(t, err)
+	})
 }
 
 func TestDatabase_GetPhotos(t *testing.T) {
-	type args struct {
-		ctx context.Context
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	db, mock := NewMock()
+	defer db.Close()
+	dbtes := Database{
+		SqlDb: db,
 	}
-	tests := []struct {
-		name    string
-		s       *Database
-		args    args
-		want    []entity.PhotoGetOutput
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.GetPhotos(tt.args.ctx)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Database.GetPhotos() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Database.GetPhotos() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	var qry strings.Builder
+	qry.WriteString("select p.id, p.title, p.caption, p.photourl, p.userid, p.createdat, p.updatedat, u.email, u.username from photos p")
+	qry.WriteString(" join users u on p.userid=u.id")
+	t.Run("getphotos database down", func(t *testing.T) {
+		mock.ExpectQuery(qry.String()).
+			WillReturnError(errors.New("db down"))
+		out, err := dbtes.GetPhotos(ctx)
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "db down", err.Error())
+	})
+
+	t.Run("getphotos success", func(t *testing.T) {
+		rows := mock.NewRows([]string{"id", "title", "caption", "photourl", "userid", "createdat", "updatedat", "email", "username"}).
+			AddRow(1, "Foto Kopi", "Foto kopi doang beneran", "http://imageurl.com/fotokopi.jpg", 1, time.Now(), time.Now(), "deadapeipit@email.com", "deadapeipit")
+
+		mock.ExpectQuery(qry.String()).WillReturnRows(rows)
+		out, err := dbtes.GetPhotos(ctx)
+		assert.NotNil(t, out)
+		assert.NoError(t, err)
+	})
 }
 
 func TestDatabase_GetPhotosByUserID(t *testing.T) {
-	type args struct {
-		ctx    context.Context
-		userid int64
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	db, mock := NewMock()
+	defer db.Close()
+	dbtes := Database{
+		SqlDb: db,
 	}
-	tests := []struct {
-		name    string
-		s       *Database
-		args    args
-		want    []entity.Photo
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.GetPhotosByUserID(tt.args.ctx, tt.args.userid)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Database.GetPhotosByUserID() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Database.GetPhotosByUserID() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	qry := "select id, title, caption, photourl, userid, createdat, updatedat from photos where userid=@userid"
+	t.Run("getphotosbyuserid database down", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1)).
+			WillReturnError(errors.New("db down"))
+		out, err := dbtes.GetPhotosByUserID(ctx, int64(1))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "db down", err.Error())
+	})
+
+	t.Run("getphotosbyuserid required userid", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1)).
+			WillReturnError(errors.New("required userid"))
+		out, err := dbtes.GetPhotosByUserID(ctx, int64(0))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required userid", err.Error())
+	})
+
+	t.Run("getphotosbyuserid success", func(t *testing.T) {
+		rows := mock.NewRows([]string{"id", "title", "caption", "photourl", "userid", "createdat"}).
+			AddRow(1, "Foto Kopi", "Foto kopi doang beneran", "http://imageurl.com/fotokopi.jpg", 1, time.Now())
+
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1)).
+			WillReturnRows(rows)
+		out, err := dbtes.GetPhotosByUserID(ctx, int64(1))
+		assert.NotNil(t, out)
+		assert.NoError(t, err)
+	})
 }
 
 func TestDatabase_GetPhotoByID(t *testing.T) {
-	type args struct {
-		ctx context.Context
-		id  int64
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	db, mock := NewMock()
+	defer db.Close()
+	dbtes := Database{
+		SqlDb: db,
 	}
-	tests := []struct {
-		name    string
-		s       *Database
-		args    args
-		want    *entity.Photo
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.GetPhotoByID(tt.args.ctx, tt.args.id)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Database.GetPhotoByID() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Database.GetPhotoByID() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	qry := "select id, title, caption, photourl, userid, createdat, updatedat from photos where id = @ID"
+	t.Run("getphotosbyid database down", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1)).
+			WillReturnError(errors.New("db down"))
+		out, err := dbtes.GetPhotoByID(ctx, int64(1))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "db down", err.Error())
+	})
+
+	t.Run("getphotosbyid required id", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1)).
+			WillReturnError(errors.New("required id"))
+		out, err := dbtes.GetPhotoByID(ctx, int64(0))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required id", err.Error())
+	})
+
+	t.Run("getphotosbyid success", func(t *testing.T) {
+		rows := mock.NewRows([]string{"id", "title", "caption", "photourl", "userid", "createdat", "updatedat"}).
+			AddRow(1, "Foto Kopi", "Foto kopi doang beneran", "http://imageurl.com/fotokopi.jpg", 1, time.Now(), time.Now())
+
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1)).
+			WillReturnRows(rows)
+		out, err := dbtes.GetPhotoByID(ctx, int64(1))
+		assert.NotNil(t, out)
+		assert.NoError(t, err)
+	})
 }
 
 func TestDatabase_UpdatePhoto(t *testing.T) {
-	type args struct {
-		ctx      context.Context
-		userid   int64
-		id       int64
-		title    string
-		caption  string
-		photourl string
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	db, mock := NewMock()
+	defer db.Close()
+	dbtes := Database{
+		SqlDb: db,
 	}
-	tests := []struct {
-		name    string
-		s       *Database
-		args    args
-		want    *entity.Photo
-		wantErr bool
-	}{
-		// TODO: Add test cases.
+	qry := "update photos set title=@title, caption=@caption, photourl=@photourl, updatedat=@updatedat where id = @ID and userid = @userid; select id, title, caption, photourl, userid, updatedat from photos where id = @ID"
+	inp := entity.PhotoPost{
+		Title:    "Foto Kopi",
+		Caption:  "Foto kopi doang beneran",
+		PhotoUrl: "https://imageurl.com/fotokopi.jpg",
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.UpdatePhoto(tt.args.ctx, tt.args.userid, tt.args.id, tt.args.title, tt.args.caption, tt.args.photourl)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Database.UpdatePhoto() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Database.UpdatePhoto() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+
+	t.Run("updatephoto database down", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), int64(1), inp).
+			WillReturnError(errors.New("db down"))
+		out, err := dbtes.UpdatePhoto(ctx, int64(1), int64(1), inp)
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "db down", err.Error())
+	})
+
+	t.Run("updatephoto required id", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), int64(0), inp).
+			WillReturnError(errors.New("required id"))
+		out, err := dbtes.UpdatePhoto(ctx, int64(1), int64(0), inp)
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required id", err.Error())
+	})
+
+	t.Run("updatephoto required userid", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(0), int64(1), inp).
+			WillReturnError(errors.New("required userid"))
+		out, err := dbtes.UpdatePhoto(ctx, int64(0), int64(1), inp)
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required userid", err.Error())
+	})
+
+	t.Run("updatephoto success", func(t *testing.T) {
+		rows := mock.NewRows([]string{"id", "title", "caption", "photourl", "userid", "updatedat"}).
+			AddRow(1, "Foto Kopi", "Foto kopi doang beneran", "http://imageurl.com/fotokopi.jpg", 1, time.Now())
+
+		mock.ExpectQuery(qry).
+			WithArgs(int64(0), int64(1), inp).
+			WillReturnRows(rows)
+		out, err := dbtes.UpdatePhoto(ctx, int64(1), int64(1), inp)
+		assert.NotNil(t, out)
+		assert.NoError(t, err)
+	})
 }
 
 func TestDatabase_DeletePhoto(t *testing.T) {
-	type args struct {
-		ctx    context.Context
-		userid int64
-		id     int64
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	db, mock := NewMock()
+	defer db.Close()
+	dbtes := Database{
+		SqlDb: db,
 	}
-	tests := []struct {
-		name    string
-		s       *Database
-		args    args
-		want    string
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.DeletePhoto(tt.args.ctx, tt.args.userid, tt.args.id)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Database.DeletePhoto() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("Database.DeletePhoto() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	qry := "delete from comments where photoid=@id and userid=@userid; delete from photos where id=@id and userid=@userid"
+	t.Run("deletephoto database down", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), int64(1)).
+			WillReturnError(errors.New("db down"))
+		out, err := dbtes.DeletePhoto(ctx, int64(1), int64(1))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "db down", err.Error())
+	})
+
+	t.Run("deletephoto required userid", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(0), int64(1)).
+			WillReturnError(errors.New("required userid"))
+		out, err := dbtes.DeletePhoto(ctx, int64(0), int64(1))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required userid", err.Error())
+	})
+
+	t.Run("deletephoto required id", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), int64(0)).
+			WillReturnError(errors.New("required id"))
+		out, err := dbtes.DeletePhoto(ctx, int64(1), int64(0))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required id", err.Error())
+	})
+
+	t.Run("deletephoto success", func(t *testing.T) {
+		mock.ExpectExec(qry).
+			WithArgs(int64(1)).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		out, err := dbtes.DeletePhoto(ctx, int64(1), int64(0))
+		assert.NotNil(t, out)
+		assert.NoError(t, err)
+	})
 }

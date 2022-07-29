@@ -36,6 +36,7 @@ func TestDatabase_Login(t *testing.T) {
 	qry := "select id, password from users where username = @username"
 	t.Run("login database down", func(t *testing.T) {
 		mock.ExpectQuery(qry).
+			WithArgs("deadapeipit").
 			WillReturnError(errors.New("db down"))
 		id, pass, err := dbtes.Login(ctx, "deadapeipit")
 		assert.Error(t, err)
@@ -48,7 +49,9 @@ func TestDatabase_Login(t *testing.T) {
 		rows := mock.NewRows([]string{"id", "password"}).
 			AddRow(1, "deadapeipit")
 
-		mock.ExpectQuery(qry).WillReturnRows(rows)
+		mock.ExpectQuery(qry).
+			WithArgs("deadapeipit").
+			WillReturnRows(rows)
 		id, pass, err := dbtes.Login(ctx, "deadapeipit")
 		assert.NotEqual(t, int64(0), id)
 		assert.NotEqual(t, "", pass)
@@ -68,6 +71,7 @@ func TestDatabase_GetUserByID(t *testing.T) {
 	qry := "select id, username, email, password, age, createdat, updatedat from users where id = @ID"
 	t.Run("getuserbyid database down", func(t *testing.T) {
 		mock.ExpectQuery(qry).
+			WithArgs(int64(1)).
 			WillReturnError(errors.New("db down"))
 		out, err := dbtes.GetUserByID(ctx, int64(1))
 		assert.Error(t, err)
@@ -77,6 +81,7 @@ func TestDatabase_GetUserByID(t *testing.T) {
 
 	t.Run("getuserbyid required userid", func(t *testing.T) {
 		mock.ExpectQuery(qry).
+			WithArgs(int64(1)).
 			WillReturnError(errors.New("required userid"))
 		out, err := dbtes.GetUserByID(ctx, int64(0))
 		assert.Error(t, err)
@@ -88,7 +93,9 @@ func TestDatabase_GetUserByID(t *testing.T) {
 		rows := mock.NewRows([]string{"id", "username", "email", "password", "age", "createdat", "updatedat"}).
 			AddRow(1, "deadapeipit", "deadapeipit@github.com", "$2a$10$rcIrmHvODKlw91zkIVeEGeAomU47EBbAveY8//HCvYK7cqrd23gx2", 22, time.Now(), time.Now())
 
-		mock.ExpectQuery(qry).WillReturnRows(rows)
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1)).
+			WillReturnRows(rows)
 		out, err := dbtes.GetUserByID(ctx, int64(1))
 		assert.NotNil(t, out)
 		assert.NoError(t, err)
@@ -107,6 +114,7 @@ func TestDatabase_UpdateUser(t *testing.T) {
 	qry := "update users set email=@email, username=@username, updatedat=@updatedat where id = @ID; select ID, email, username, age, updatedat from users where id = @ID"
 	t.Run("updateuser database down", func(t *testing.T) {
 		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(int64(1), "deadapeipit@github.com", "deadapeipit").
 			WillReturnError(errors.New("db down"))
 		out, err := dbtes.UpdateUser(ctx, int64(1), "deadapeipit@github.com", "deadapeipit")
 		assert.Error(t, err)
@@ -116,6 +124,7 @@ func TestDatabase_UpdateUser(t *testing.T) {
 
 	t.Run("updateuser required userid", func(t *testing.T) {
 		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(int64(1), "deadapeipit@github.com", "deadapeipit").
 			WillReturnError(errors.New("required userid"))
 		out, err := dbtes.UpdateUser(ctx, int64(1), "deadapeipit@github.com", "deadapeipit")
 		assert.Error(t, err)
@@ -127,7 +136,9 @@ func TestDatabase_UpdateUser(t *testing.T) {
 		rows := mock.NewRows([]string{"id", "username", "email", "age", "updatedat"}).
 			AddRow(1, "deadapeipit", "deadapeipit@github.com", 22, time.Now())
 
-		mock.ExpectQuery(regexp.QuoteMeta(qry)).WillReturnRows(rows)
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(int64(1), "deadapeipit@github.com", "deadapeipit").
+			WillReturnRows(rows)
 		out, err := dbtes.UpdateUser(ctx, int64(1), "deadapeipit@github.com", "deadapeipit")
 		assert.NotNil(t, out)
 		assert.NoError(t, err)
@@ -152,6 +163,7 @@ func TestDatabase_Register(t *testing.T) {
 	qry := "insert into users (username, email, password, age, createdat, updatedat) values (@username, @email, @password, @age, @createdat, @updatedat)"
 	t.Run("register database down", func(t *testing.T) {
 		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp).
 			WillReturnError(errors.New("db down"))
 		out, err := dbtes.Register(ctx, inp)
 		assert.Error(t, err)
@@ -159,20 +171,13 @@ func TestDatabase_Register(t *testing.T) {
 		assert.Equal(t, "db down", err.Error())
 	})
 
-	t.Run("register required userid", func(t *testing.T) {
-		mock.ExpectQuery(regexp.QuoteMeta(qry)).
-			WillReturnError(errors.New("required userid"))
-		out, err := dbtes.Register(ctx, inp)
-		assert.Error(t, err)
-		assert.Nil(t, out)
-		assert.Equal(t, "required userid", err.Error())
-	})
-
 	t.Run("register success", func(t *testing.T) {
 		rows := mock.NewRows([]string{"id", "username", "email", "age"}).
 			AddRow(1, "deadapeipit", "deadapeipit@github.com", 22)
 
-		mock.ExpectQuery(regexp.QuoteMeta(qry)).WillReturnRows(rows)
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp).
+			WillReturnRows(rows)
 		out, err := dbtes.Register(ctx, inp)
 		assert.NotNil(t, out)
 		assert.NoError(t, err)
@@ -188,31 +193,32 @@ func TestDatabase_DeleteUser(t *testing.T) {
 	dbtes := Database{
 		SqlDb: db,
 	}
-	qry := "select id, username, email, password, age, createdat, updatedat from users where id = @ID"
-	t.Run("getuserbyid database down", func(t *testing.T) {
-		mock.ExpectQuery(qry).
+	qry := "delete from socialmedias where userid=@id; delete from photos where userid=@id; delete from comments where userid=@id; delete from users where id=@id"
+	t.Run("deleteuser database down", func(t *testing.T) {
+		mock.ExpectExec(qry).
+			WithArgs(int64(1)).
 			WillReturnError(errors.New("db down"))
-		out, err := dbtes.GetUserByID(ctx, int64(1))
+		out, err := dbtes.DeleteUser(ctx, int64(1))
 		assert.Error(t, err)
 		assert.Nil(t, out)
 		assert.Equal(t, "db down", err.Error())
 	})
 
-	t.Run("getuserbyid required userid", func(t *testing.T) {
-		mock.ExpectQuery(qry).
+	t.Run("deleteuser required userid", func(t *testing.T) {
+		mock.ExpectExec(qry).
+			WithArgs(int64(0)).
 			WillReturnError(errors.New("required userid"))
-		out, err := dbtes.GetUserByID(ctx, int64(0))
+		out, err := dbtes.DeleteUser(ctx, int64(0))
 		assert.Error(t, err)
 		assert.Nil(t, out)
 		assert.Equal(t, "required userid", err.Error())
 	})
 
-	t.Run("getuserbyid success", func(t *testing.T) {
-		rows := mock.NewRows([]string{"id", "username", "email", "password", "age", "createdat", "updatedat"}).
-			AddRow(1, "deadapeipit", "deadapeipit@github.com", "$2a$10$rcIrmHvODKlw91zkIVeEGeAomU47EBbAveY8//HCvYK7cqrd23gx2", 22, time.Now(), time.Now())
-
-		mock.ExpectQuery(qry).WillReturnRows(rows)
-		out, err := dbtes.GetUserByID(ctx, int64(1))
+	t.Run("deleteuser success", func(t *testing.T) {
+		mock.ExpectExec(qry).
+			WithArgs(int64(1)).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		out, err := dbtes.DeleteUser(ctx, int64(1))
 		assert.NotNil(t, out)
 		assert.NoError(t, err)
 	})

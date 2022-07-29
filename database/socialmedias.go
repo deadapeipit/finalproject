@@ -76,7 +76,7 @@ func (s *Database) GetSocialMedias(ctx context.Context) ([]entity.SocialMediaGet
 func (s *Database) GetSocialMediaByID(ctx context.Context, id int64) (*entity.SocialMedia, error) {
 	result := &entity.SocialMedia{}
 
-	rows, err := s.SqlDb.QueryContext(ctx, "sselect id, name, socialmediaurl, userid, createdat, updatedat from socialmedias where id = @ID",
+	rows, err := s.SqlDb.QueryContext(ctx, "select id, name, socialmediaurl, userid, createdat, updatedat from socialmedias where id = @ID",
 		sql.Named("ID", id))
 	if err != nil {
 		return nil, err

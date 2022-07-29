@@ -2,178 +2,289 @@ package database
 
 import (
 	"context"
+	"errors"
 	"finalproject/entity"
-	"reflect"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDatabase_PostComment(t *testing.T) {
-	type args struct {
-		ctx    context.Context
-		userid int64
-		i      entity.CommentPost
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	db, mock := NewMock()
+	defer db.Close()
+	dbtes := Database{
+		SqlDb: db,
 	}
-	tests := []struct {
-		name    string
-		s       *Database
-		args    args
-		want    *entity.Comment
-		wantErr bool
-	}{
-		// TODO: Add test cases.
+	qry := "insert into comments (message, photoid, userid, createdat, updatedat) values (@message, @photoid, @userid, @createdat, @updatedat); select id, message, photoid, userid, createdat from comments where id = SCOPE_IDENTITY()"
+
+	inp := entity.CommentPost{
+		Message: "Foto Kopi",
+		PhotoID: 1,
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.PostComment(tt.args.ctx, tt.args.userid, tt.args.i)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Database.PostComment() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Database.PostComment() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+
+	t.Run("postcomment database down", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), inp).
+			WillReturnError(errors.New("db down"))
+		out, err := dbtes.PostComment(ctx, int64(1), inp)
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "db down", err.Error())
+	})
+
+	t.Run("postcomment required userid", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), inp).
+			WillReturnError(errors.New("required userid"))
+		out, err := dbtes.PostComment(ctx, int64(0), inp)
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required userid", err.Error())
+	})
+
+	t.Run("postcomment success", func(t *testing.T) {
+		rows := mock.NewRows([]string{"id", "message", "photoid", "userid", "createdat"}).
+			AddRow(1, "Message nya apa", 1, 1, time.Now())
+
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), inp).
+			WillReturnRows(rows)
+		out, err := dbtes.PostComment(ctx, int64(1), inp)
+		assert.NotNil(t, out)
+		assert.NoError(t, err)
+	})
 }
 
 func TestDatabase_GetComments(t *testing.T) {
-	type args struct {
-		ctx context.Context
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	db, mock := NewMock()
+	defer db.Close()
+	dbtes := Database{
+		SqlDb: db,
 	}
-	tests := []struct {
-		name    string
-		s       *Database
-		args    args
-		want    []entity.CommentGetOutput
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.GetComments(tt.args.ctx)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Database.GetComments() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Database.GetComments() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	var qry strings.Builder
+	qry.WriteString("select c.id, c.message, c.photoid, c.userid, c.createdat, c.updatedat,")
+	qry.WriteString(" p.title, p.caption, p.photourl,")
+	qry.WriteString(" u.email, u.username from comments c")
+	qry.WriteString(" join photos p on c.photoid=p.id")
+	qry.WriteString(" join users u on c.userid=u.id")
+	t.Run("getcomments database down", func(t *testing.T) {
+		mock.ExpectQuery(qry.String()).
+			WillReturnError(errors.New("db down"))
+		out, err := dbtes.GetComments(ctx)
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "db down", err.Error())
+	})
+
+	t.Run("getcomments success", func(t *testing.T) {
+		rows := mock.NewRows([]string{"id", "message", "photoid", "userid", "createdat", "updatedat", "title", "captio", "photourl", "email", "username"}).
+			AddRow(1, "Message nya apa", 1, 1, time.Now(), time.Now(), "Title photo", "http://photourl.com/photourl.jpg", "deadapeipit@email.com", "deadapeipit")
+
+		mock.ExpectQuery(qry.String()).WillReturnRows(rows)
+		out, err := dbtes.GetComments(ctx)
+		assert.NotNil(t, out)
+		assert.NoError(t, err)
+	})
 }
 
 func TestDatabase_GetCommentsByPhotoID(t *testing.T) {
-	type args struct {
-		ctx     context.Context
-		photoid int64
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	db, mock := NewMock()
+	defer db.Close()
+	dbtes := Database{
+		SqlDb: db,
 	}
-	tests := []struct {
-		name    string
-		s       *Database
-		args    args
-		want    []entity.Comment
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.GetCommentsByPhotoID(tt.args.ctx, tt.args.photoid)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Database.GetCommentsByPhotoID() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Database.GetCommentsByPhotoID() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	qry := "select id, message, photoid, userid, createdat, updatedat from comments where photoid=@photoid"
+	t.Run("getcommentsbyphotoid database down", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1)).
+			WillReturnError(errors.New("db down"))
+		out, err := dbtes.GetCommentsByPhotoID(ctx, int64(1))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "db down", err.Error())
+	})
+
+	t.Run("getcommentsbyphotoid required photoid", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1)).
+			WillReturnError(errors.New("required photoid"))
+		out, err := dbtes.GetCommentsByPhotoID(ctx, int64(0))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required photoid", err.Error())
+	})
+
+	t.Run("getcommentsbyphotoid success", func(t *testing.T) {
+		rows := mock.NewRows([]string{"id", "message", "photoid", "userid", "createdat", "updatedat"}).
+			AddRow(1, "Message nya apa", 1, 1, time.Now(), time.Now())
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1)).
+			WillReturnRows(rows)
+		out, err := dbtes.GetCommentsByPhotoID(ctx, int64(1))
+		assert.NotNil(t, out)
+		assert.NoError(t, err)
+	})
 }
 
 func TestDatabase_GetCommentByID(t *testing.T) {
-	type args struct {
-		ctx context.Context
-		id  int64
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	db, mock := NewMock()
+	defer db.Close()
+	dbtes := Database{
+		SqlDb: db,
 	}
-	tests := []struct {
-		name    string
-		s       *Database
-		args    args
-		want    *entity.Comment
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.GetCommentByID(tt.args.ctx, tt.args.id)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Database.GetCommentByID() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Database.GetCommentByID() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	qry := "select id, message, photoid, userid, createdat, updatedat from comments where id = @ID"
+	t.Run("getcommentbyid database down", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1)).
+			WillReturnError(errors.New("db down"))
+		out, err := dbtes.GetCommentByID(ctx, int64(1))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "db down", err.Error())
+	})
+
+	t.Run("getcommentbyid required id", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1)).
+			WillReturnError(errors.New("required id"))
+		out, err := dbtes.GetCommentByID(ctx, int64(0))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required id", err.Error())
+	})
+
+	t.Run("getcommentbyid success", func(t *testing.T) {
+		rows := mock.NewRows([]string{"id", "message", "photoid", "userid", "createdat", "updatedat"}).
+			AddRow(1, "Message nya apa", 1, 1, time.Now(), time.Now())
+
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1)).
+			WillReturnRows(rows)
+		out, err := dbtes.GetCommentByID(ctx, int64(1))
+		assert.NotNil(t, out)
+		assert.NoError(t, err)
+	})
 }
 
 func TestDatabase_UpdateComment(t *testing.T) {
-	type args struct {
-		ctx     context.Context
-		userid  int64
-		id      int64
-		message string
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	db, mock := NewMock()
+	defer db.Close()
+	dbtes := Database{
+		SqlDb: db,
 	}
-	tests := []struct {
-		name    string
-		s       *Database
-		args    args
-		want    *entity.Comment
-		wantErr bool
-	}{
-		// TODO: Add test cases.
+	qry := "update comments set message=@message, updatedat=@updatedat where id = @ID and userid = userid; select id, userid, photoid, message, updatedat from comments where id = @ID"
+	inp := entity.CommentPost{
+		Message: "Foto Kopi",
+		PhotoID: 1,
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.UpdateComment(tt.args.ctx, tt.args.userid, tt.args.id, tt.args.message)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Database.UpdateComment() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Database.UpdateComment() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	t.Run("updatecomment database down", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), int64(1), inp.Message).
+			WillReturnError(errors.New("db down"))
+		out, err := dbtes.UpdateComment(ctx, int64(1), int64(1), inp.Message)
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "db down", err.Error())
+	})
+
+	t.Run("updatecomment required id", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), int64(1), inp.Message).
+			WillReturnError(errors.New("required id"))
+		out, err := dbtes.UpdateComment(ctx, int64(1), int64(1), inp.Message)
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required id", err.Error())
+	})
+
+	t.Run("updatecomment required userid", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), int64(1), inp.Message).
+			WillReturnError(errors.New("required userid"))
+		out, err := dbtes.UpdateComment(ctx, int64(1), int64(1), inp.Message)
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required userid", err.Error())
+	})
+
+	t.Run("updatecomment success", func(t *testing.T) {
+		rows := mock.NewRows([]string{"id", "title", "caption", "photourl", "userid", "updatedat"}).
+			AddRow(1, "Foto Kopi", "Foto kopi doang beneran", "http://imageurl.com/fotokopi.jpg", 1, time.Now())
+
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), int64(1), inp.Message).
+			WillReturnRows(rows)
+		out, err := dbtes.UpdateComment(ctx, int64(1), int64(1), inp.Message)
+		assert.NotNil(t, out)
+		assert.NoError(t, err)
+	})
 }
 
 func TestDatabase_DeleteComment(t *testing.T) {
-	type args struct {
-		ctx    context.Context
-		userid int64
-		id     int64
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	db, mock := NewMock()
+	defer db.Close()
+	dbtes := Database{
+		SqlDb: db,
 	}
-	tests := []struct {
-		name    string
-		s       *Database
-		args    args
-		want    string
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.DeleteComment(tt.args.ctx, tt.args.userid, tt.args.id)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Database.DeleteComment() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("Database.DeleteComment() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	qry := "delete from comments where id=@id and userid = @userid"
+	t.Run("deletecomment database down", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), int64(1)).
+			WillReturnError(errors.New("db down"))
+		out, err := dbtes.DeleteComment(ctx, int64(1), int64(1))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "db down", err.Error())
+	})
+
+	t.Run("deletecomment required userid", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(0), int64(1)).
+			WillReturnError(errors.New("required userid"))
+		out, err := dbtes.DeleteComment(ctx, int64(0), int64(1))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required userid", err.Error())
+	})
+
+	t.Run("deletecomment required id", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), int64(0)).
+			WillReturnError(errors.New("required id"))
+		out, err := dbtes.DeleteComment(ctx, int64(1), int64(0))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required id", err.Error())
+	})
+
+	t.Run("deletecomment success", func(t *testing.T) {
+		mock.ExpectExec(qry).
+			WithArgs(int64(1)).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		out, err := dbtes.DeleteComment(ctx, int64(1), int64(0))
+		assert.NotNil(t, out)
+		assert.NoError(t, err)
+	})
 }

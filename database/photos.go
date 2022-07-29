@@ -44,7 +44,7 @@ func (s *Database) PostPhoto(ctx context.Context, u int64, i entity.PhotoPost) (
 func (s *Database) GetPhotos(ctx context.Context) ([]entity.PhotoGetOutput, error) {
 	var result []entity.PhotoGetOutput
 	var qry strings.Builder
-	qry.WriteString("select p.id, p.title, p.caption, p.photourl, p.userid, p.createdat, p.updatedat, u.email, u.password from photos p")
+	qry.WriteString("select p.id, p.title, p.caption, p.photourl, p.userid, p.createdat, p.updatedat, u.email, u.username from photos p")
 	qry.WriteString(" join users u on p.userid=u.id")
 	rows, err := s.SqlDb.QueryContext(ctx, qry.String())
 	if err != nil {
@@ -102,8 +102,8 @@ func (s *Database) GetPhotosByUserID(ctx context.Context, userid int64) ([]entit
 
 func (s *Database) GetPhotoByID(ctx context.Context, id int64) (*entity.Photo, error) {
 	result := &entity.Photo{}
-
-	rows, err := s.SqlDb.QueryContext(ctx, "select id, title, caption, photourl, userid, createdat, updatedat from photos where id = @ID",
+	qry := "select id, title, caption, photourl, userid, createdat, updatedat from photos where id = @ID"
+	rows, err := s.SqlDb.QueryContext(ctx, qry,
 		sql.Named("ID", id))
 	if err != nil {
 		return nil, err
@@ -126,14 +126,14 @@ func (s *Database) GetPhotoByID(ctx context.Context, id int64) (*entity.Photo, e
 	return result, nil
 }
 
-func (s *Database) UpdatePhoto(ctx context.Context, userid int64, id int64, title string, caption string, photourl string) (*entity.Photo, error) {
+func (s *Database) UpdatePhoto(ctx context.Context, userid int64, id int64, i entity.PhotoPost) (*entity.Photo, error) {
 	result := &entity.Photo{}
 	now := time.Now()
 	qry := "update photos set title=@title, caption=@caption, photourl=@photourl, updatedat=@updatedat where id = @ID and userid = @userid; select id, title, caption, photourl, userid, updatedat from photos where id = @ID"
 	rows, err := s.SqlDb.QueryContext(ctx, qry,
-		sql.Named("title", title),
-		sql.Named("caption", caption),
-		sql.Named("photourl", photourl),
+		sql.Named("title", i.Title),
+		sql.Named("caption", i.Caption),
+		sql.Named("photourl", i.PhotoUrl),
 		sql.Named("updatedat", now),
 		sql.Named("userid", userid),
 		sql.Named("ID", id))

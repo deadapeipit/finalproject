@@ -2,150 +2,246 @@ package database
 
 import (
 	"context"
+	"errors"
 	"finalproject/entity"
-	"reflect"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDatabase_PostSocialMedia(t *testing.T) {
-	type args struct {
-		ctx    context.Context
-		userid int64
-		i      entity.SocialMediaPost
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	db, mock := NewMock()
+	defer db.Close()
+	dbtes := Database{
+		SqlDb: db,
 	}
-	tests := []struct {
-		name    string
-		s       *Database
-		args    args
-		want    *entity.SocialMedia
-		wantErr bool
-	}{
-		// TODO: Add test cases.
+	qry := "insert into socialmedias (name, socialmediaurl, profileimageurl, userid, createdat, updatedat) values (@name, @socialmediaurl, @profileimageurl, @userid, @createdat, @updatedat); select id, name, socialmediaurl, profileimageurl, userid, createdat,updatedat from socialmedias"
+
+	inp := entity.SocialMediaPost{
+		Name:            "socialmedia orang ganteng",
+		SocialMediaURL:  "https://socialmediaurl.com/socialmediaurl.jpg",
+		ProfileImageURL: "https://profileimageurl.com/profileimageurl.jpg",
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.PostSocialMedia(tt.args.ctx, tt.args.userid, tt.args.i)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Database.PostSocialMedia() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Database.PostSocialMedia() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+
+	t.Run("postsocialmedia database down", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), inp).
+			WillReturnError(errors.New("db down"))
+		out, err := dbtes.PostSocialMedia(ctx, int64(1), inp)
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "db down", err.Error())
+	})
+
+	t.Run("postsocialmedia required userid", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), inp).
+			WillReturnError(errors.New("required userid"))
+		out, err := dbtes.PostSocialMedia(ctx, int64(0), inp)
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required userid", err.Error())
+	})
+
+	t.Run("postsocialmedia success", func(t *testing.T) {
+		rows := mock.NewRows([]string{"id", "name", "socialmediaurl", "profileimageurl", "userid", "createdat", "updatedat"}).
+			AddRow(1, "SocialMedia Name", "http://socialmediaurl.com/socialmediaurl.jpg", "http://profileimageurl.com/profileimageurl.jpg", 1, time.Now(), time.Now())
+
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), inp).
+			WillReturnRows(rows)
+		out, err := dbtes.PostSocialMedia(ctx, int64(1), inp)
+		assert.NotNil(t, out)
+		assert.NoError(t, err)
+	})
 }
 
 func TestDatabase_GetSocialMedias(t *testing.T) {
-	type args struct {
-		ctx context.Context
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	db, mock := NewMock()
+	defer db.Close()
+	dbtes := Database{
+		SqlDb: db,
 	}
-	tests := []struct {
-		name    string
-		s       *Database
-		args    args
-		want    []entity.SocialMediaGetOutput
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.GetSocialMedias(tt.args.ctx)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Database.GetSocialMedias() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Database.GetSocialMedias() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	var qry strings.Builder
+	qry.WriteString("select s.id, s.name, s.socialmediaurl, s.userid, s.createdat, s.updatedat,")
+	qry.WriteString(" u.username, s.profileimageurl")
+	qry.WriteString(" from socialmedias s join users u on s.userid=u.id")
+	t.Run("getsocialmedias database down", func(t *testing.T) {
+		mock.ExpectQuery(qry.String()).
+			WillReturnError(errors.New("db down"))
+		out, err := dbtes.GetSocialMedias(ctx)
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "db down", err.Error())
+	})
+
+	t.Run("getsocialmedias success", func(t *testing.T) {
+		rows := mock.NewRows([]string{"id", "name", "socialmediaurl", "userid", "createdat", "updatedat"}).
+			AddRow(1, "SocialMedia Name", "http://socialmediaurl.com/socialmediaurl.jpg", 1, time.Now(), time.Now())
+
+		mock.ExpectQuery(qry.String()).WillReturnRows(rows)
+		out, err := dbtes.GetSocialMedias(ctx)
+		assert.NotNil(t, out)
+		assert.NoError(t, err)
+	})
 }
 
 func TestDatabase_GetSocialMediaByID(t *testing.T) {
-	type args struct {
-		ctx context.Context
-		id  int64
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	db, mock := NewMock()
+	defer db.Close()
+	dbtes := Database{
+		SqlDb: db,
 	}
-	tests := []struct {
-		name    string
-		s       *Database
-		args    args
-		want    *entity.SocialMedia
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.GetSocialMediaByID(tt.args.ctx, tt.args.id)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Database.GetSocialMediaByID() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Database.GetSocialMediaByID() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+
+	qry := "select id, name, socialmediaurl, userid, createdat, updatedat from socialmedias where id = @ID"
+	t.Run("getsocialmediabyid database down", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), int64(1)).
+			WillReturnError(errors.New("db down"))
+		out, err := dbtes.GetSocialMediaByID(ctx, int64(1))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "db down", err.Error())
+	})
+
+	t.Run("getsocialmediabyid required userid", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), int64(0)).
+			WillReturnError(errors.New("required userid"))
+		out, err := dbtes.GetSocialMediaByID(ctx, int64(0))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required userid", err.Error())
+	})
+
+	t.Run("getsocialmediabyid success", func(t *testing.T) {
+		rows := mock.NewRows([]string{"id", "name", "socialmediaurl", "userid", "createdat", "updatedat"}).
+			AddRow(1, "SocialMedia Name", "http://socialmediaurl.com/socialmediaurl.jpg", 1, time.Now(), time.Now())
+
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), int64(1)).
+			WillReturnRows(rows)
+		out, err := dbtes.GetSocialMediaByID(ctx, int64(1))
+		assert.NotNil(t, out)
+		assert.NoError(t, err)
+	})
 }
 
 func TestDatabase_UpdateSocialMedia(t *testing.T) {
-	type args struct {
-		ctx    context.Context
-		userid int64
-		id     int64
-		i      entity.SocialMediaPost
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	db, mock := NewMock()
+	defer db.Close()
+	dbtes := Database{
+		SqlDb: db,
 	}
-	tests := []struct {
-		name    string
-		s       *Database
-		args    args
-		want    *entity.SocialMedia
-		wantErr bool
-	}{
-		// TODO: Add test cases.
+
+	qry := "update socialmedias set name=@name, socialmediaurl=@socialmediaurl, profileimageurl=@profileimageurl, updatedat=@updatedat where id = @ID; select id, name, socialmediaurl, profileimageurl, userid, updatedat from socialmedias where id = @ID"
+	inp := entity.SocialMediaPost{
+		Name:            "socialmedia orang ganteng",
+		SocialMediaURL:  "https://socialmediaurl.com/socialmediaurl.jpg",
+		ProfileImageURL: "https://profileimageurl.com/profileimageurl.jpg",
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.UpdateSocialMedia(tt.args.ctx, tt.args.userid, tt.args.id, tt.args.i)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Database.UpdateSocialMedia() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Database.UpdateSocialMedia() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	t.Run("updatesocialmedia database down", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), int64(1), inp).
+			WillReturnError(errors.New("db down"))
+		out, err := dbtes.UpdateSocialMedia(ctx, int64(1), int64(1), inp)
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "db down", err.Error())
+	})
+
+	t.Run("updatesocialmedia required userid", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(0), int64(1), inp).
+			WillReturnError(errors.New("required userid"))
+		out, err := dbtes.UpdateSocialMedia(ctx, int64(0), int64(1), inp)
+		assert.Nil(t, out)
+		assert.Equal(t, "required userid", err.Error())
+	})
+
+	t.Run("updatesocialmedia required id", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), int64(0), inp).
+			WillReturnError(errors.New("required id"))
+		out, err := dbtes.UpdateSocialMedia(ctx, int64(1), int64(0), inp)
+		assert.Nil(t, out)
+		assert.Equal(t, "required id", err.Error())
+	})
+
+	t.Run("updatesocialmedia success", func(t *testing.T) {
+		rows := mock.NewRows([]string{"id", "name", "socialmediaurl", "userid", "updatedat"}).
+			AddRow(1, "SocialMedia Name", "http://socialmediaurl.com/socialmediaurl.jpg", 1, time.Now())
+
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), int64(1), inp).
+			WillReturnRows(rows)
+		out, err := dbtes.UpdateSocialMedia(ctx, int64(1), int64(1), inp)
+		assert.NotNil(t, out)
+		assert.NoError(t, err)
+	})
 }
 
 func TestDatabase_DeleteSocialMedia(t *testing.T) {
-	type args struct {
-		ctx    context.Context
-		userid int64
-		id     int64
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	db, mock := NewMock()
+	defer db.Close()
+	dbtes := Database{
+		SqlDb: db,
 	}
-	tests := []struct {
-		name    string
-		s       *Database
-		args    args
-		want    string
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.DeleteSocialMedia(tt.args.ctx, tt.args.userid, tt.args.id)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Database.DeleteSocialMedia() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("Database.DeleteSocialMedia() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	qry := "delete from socialmedias where id=@id and userid=@userid"
+	t.Run("deletesocialmedia database down", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1)).
+			WillReturnError(errors.New("db down"))
+		out, err := dbtes.DeleteSocialMedia(ctx, int64(1), int64(0))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "db down", err.Error())
+	})
+	t.Run("deletesocialmedia required userid", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(0), int64(1)).
+			WillReturnError(errors.New("required userid"))
+		out, err := dbtes.DeleteSocialMedia(ctx, int64(0), int64(1))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required userid", err.Error())
+	})
+
+	t.Run("deletesocialmedia required id", func(t *testing.T) {
+		mock.ExpectQuery(qry).
+			WithArgs(int64(1), int64(0)).
+			WillReturnError(errors.New("required id"))
+		out, err := dbtes.DeleteSocialMedia(ctx, int64(1), int64(0))
+		assert.Error(t, err)
+		assert.Nil(t, out)
+		assert.Equal(t, "required id", err.Error())
+	})
+
+	t.Run("deletesocialmedia success", func(t *testing.T) {
+		mock.ExpectExec(qry).
+			WithArgs(int64(1)).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		out, err := dbtes.DeleteSocialMedia(ctx, int64(1), int64(0))
+		assert.NotNil(t, out)
+		assert.NoError(t, err)
+	})
 }

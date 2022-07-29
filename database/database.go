@@ -21,7 +21,7 @@ type DatabaseIface interface {
 	GetPhotosByUserID(ctx context.Context, userid int64) ([]entity.Photo, error)
 	GetPhotoByID(ctx context.Context, id int64) (*entity.Photo, error)
 	PostPhoto(ctx context.Context, userid int64, photo entity.PhotoPost) (*entity.Photo, error)
-	UpdatePhoto(ctx context.Context, userid int64, id int64, title string, caption string, photourl string) (*entity.Photo, error)
+	UpdatePhoto(ctx context.Context, userid int64, id int64, photo entity.PhotoPost) (*entity.Photo, error)
 	DeletePhoto(ctx context.Context, userid int64, id int64) (string, error)
 
 	GetComments(ctx context.Context) ([]entity.CommentGetOutput, error)
