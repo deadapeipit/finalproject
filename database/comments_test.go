@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"finalproject/entity"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -30,8 +31,8 @@ func TestDatabase_PostComment(t *testing.T) {
 	}
 
 	t.Run("postcomment database down", func(t *testing.T) {
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), inp).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Message, inp.PhotoID, int64(1), time.Now(), time.Now()).
 			WillReturnError(errors.New("db down"))
 		out, err := dbtes.PostComment(ctx, int64(1), inp)
 		assert.Error(t, err)
@@ -40,8 +41,8 @@ func TestDatabase_PostComment(t *testing.T) {
 	})
 
 	t.Run("postcomment required userid", func(t *testing.T) {
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), inp).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Message, inp.PhotoID, int64(0), time.Now(), time.Now()).
 			WillReturnError(errors.New("required userid"))
 		out, err := dbtes.PostComment(ctx, int64(0), inp)
 		assert.Error(t, err)
@@ -53,8 +54,8 @@ func TestDatabase_PostComment(t *testing.T) {
 		rows := mock.NewRows([]string{"id", "message", "photoid", "userid", "createdat"}).
 			AddRow(1, "Message nya apa", 1, 1, time.Now())
 
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), inp).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Message, inp.PhotoID, int64(1), time.Now(), time.Now()).
 			WillReturnRows(rows)
 		out, err := dbtes.PostComment(ctx, int64(1), inp)
 		assert.NotNil(t, out)
@@ -87,8 +88,8 @@ func TestDatabase_GetComments(t *testing.T) {
 	})
 
 	t.Run("getcomments success", func(t *testing.T) {
-		rows := mock.NewRows([]string{"id", "message", "photoid", "userid", "createdat", "updatedat", "title", "captio", "photourl", "email", "username"}).
-			AddRow(1, "Message nya apa", 1, 1, time.Now(), time.Now(), "Title photo", "http://photourl.com/photourl.jpg", "deadapeipit@email.com", "deadapeipit")
+		rows := mock.NewRows([]string{"id", "message", "photoid", "userid", "createdat", "updatedat", "title", "caption", "photourl", "email", "username"}).
+			AddRow(1, "Message nya apa", 1, 1, time.Now(), time.Now(), "Title photo", "Caption Photoo", "http://photourl.com/photourl.jpg", "deadapeipit@email.com", "deadapeipit")
 
 		mock.ExpectQuery(qry.String()).WillReturnRows(rows)
 		out, err := dbtes.GetComments(ctx)
@@ -119,7 +120,7 @@ func TestDatabase_GetCommentsByPhotoID(t *testing.T) {
 
 	t.Run("getcommentsbyphotoid required photoid", func(t *testing.T) {
 		mock.ExpectQuery(qry).
-			WithArgs(int64(1)).
+			WithArgs(int64(0)).
 			WillReturnError(errors.New("required photoid"))
 		out, err := dbtes.GetCommentsByPhotoID(ctx, int64(0))
 		assert.Error(t, err)
@@ -161,7 +162,7 @@ func TestDatabase_GetCommentByID(t *testing.T) {
 
 	t.Run("getcommentbyid required id", func(t *testing.T) {
 		mock.ExpectQuery(qry).
-			WithArgs(int64(1)).
+			WithArgs(int64(0)).
 			WillReturnError(errors.New("required id"))
 		out, err := dbtes.GetCommentByID(ctx, int64(0))
 		assert.Error(t, err)
@@ -197,8 +198,8 @@ func TestDatabase_UpdateComment(t *testing.T) {
 		PhotoID: 1,
 	}
 	t.Run("updatecomment database down", func(t *testing.T) {
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), int64(1), inp.Message).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Message, time.Now(), int64(1), int64(1)).
 			WillReturnError(errors.New("db down"))
 		out, err := dbtes.UpdateComment(ctx, int64(1), int64(1), inp.Message)
 		assert.Error(t, err)
@@ -207,31 +208,31 @@ func TestDatabase_UpdateComment(t *testing.T) {
 	})
 
 	t.Run("updatecomment required id", func(t *testing.T) {
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), int64(1), inp.Message).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Message, time.Now(), int64(1), int64(0)).
 			WillReturnError(errors.New("required id"))
-		out, err := dbtes.UpdateComment(ctx, int64(1), int64(1), inp.Message)
+		out, err := dbtes.UpdateComment(ctx, int64(1), int64(0), inp.Message)
 		assert.Error(t, err)
 		assert.Nil(t, out)
 		assert.Equal(t, "required id", err.Error())
 	})
 
 	t.Run("updatecomment required userid", func(t *testing.T) {
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), int64(1), inp.Message).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Message, time.Now(), int64(0), int64(1)).
 			WillReturnError(errors.New("required userid"))
-		out, err := dbtes.UpdateComment(ctx, int64(1), int64(1), inp.Message)
+		out, err := dbtes.UpdateComment(ctx, int64(0), int64(1), inp.Message)
 		assert.Error(t, err)
 		assert.Nil(t, out)
 		assert.Equal(t, "required userid", err.Error())
 	})
 
 	t.Run("updatecomment success", func(t *testing.T) {
-		rows := mock.NewRows([]string{"id", "title", "caption", "photourl", "userid", "updatedat"}).
-			AddRow(1, "Foto Kopi", "Foto kopi doang beneran", "http://imageurl.com/fotokopi.jpg", 1, time.Now())
+		rows := mock.NewRows([]string{"id", "userid", "photoid", "message", "updatedat"}).
+			AddRow(1, 1, 1, "Foto kopi doang beneran cuk", time.Now())
 
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), int64(1), inp.Message).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Message, time.Now(), int64(1), int64(1)).
 			WillReturnRows(rows)
 		out, err := dbtes.UpdateComment(ctx, int64(1), int64(1), inp.Message)
 		assert.NotNil(t, out)
@@ -250,40 +251,40 @@ func TestDatabase_DeleteComment(t *testing.T) {
 	}
 	qry := "delete from comments where id=@id and userid = @userid"
 	t.Run("deletecomment database down", func(t *testing.T) {
-		mock.ExpectQuery(qry).
+		mock.ExpectExec(qry).
 			WithArgs(int64(1), int64(1)).
 			WillReturnError(errors.New("db down"))
 		out, err := dbtes.DeleteComment(ctx, int64(1), int64(1))
 		assert.Error(t, err)
-		assert.Nil(t, out)
+		assert.Equal(t, "", out)
 		assert.Equal(t, "db down", err.Error())
 	})
 
 	t.Run("deletecomment required userid", func(t *testing.T) {
-		mock.ExpectQuery(qry).
+		mock.ExpectExec(qry).
 			WithArgs(int64(0), int64(1)).
 			WillReturnError(errors.New("required userid"))
 		out, err := dbtes.DeleteComment(ctx, int64(0), int64(1))
 		assert.Error(t, err)
-		assert.Nil(t, out)
+		assert.Equal(t, "", out)
 		assert.Equal(t, "required userid", err.Error())
 	})
 
 	t.Run("deletecomment required id", func(t *testing.T) {
-		mock.ExpectQuery(qry).
+		mock.ExpectExec(qry).
 			WithArgs(int64(1), int64(0)).
 			WillReturnError(errors.New("required id"))
 		out, err := dbtes.DeleteComment(ctx, int64(1), int64(0))
 		assert.Error(t, err)
-		assert.Nil(t, out)
+		assert.Equal(t, "", out)
 		assert.Equal(t, "required id", err.Error())
 	})
 
 	t.Run("deletecomment success", func(t *testing.T) {
 		mock.ExpectExec(qry).
-			WithArgs(int64(1)).
+			WithArgs(int64(1), int64(1)).
 			WillReturnResult(sqlmock.NewResult(1, 1))
-		out, err := dbtes.DeleteComment(ctx, int64(1), int64(0))
+		out, err := dbtes.DeleteComment(ctx, int64(1), int64(1))
 		assert.NotNil(t, out)
 		assert.NoError(t, err)
 	})

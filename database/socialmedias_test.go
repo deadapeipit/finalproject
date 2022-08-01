@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"finalproject/entity"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -31,8 +32,8 @@ func TestDatabase_PostSocialMedia(t *testing.T) {
 	}
 
 	t.Run("postsocialmedia database down", func(t *testing.T) {
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), inp).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Name, inp.SocialMediaURL, inp.ProfileImageURL, int64(1), time.Now(), time.Now()).
 			WillReturnError(errors.New("db down"))
 		out, err := dbtes.PostSocialMedia(ctx, int64(1), inp)
 		assert.Error(t, err)
@@ -41,8 +42,8 @@ func TestDatabase_PostSocialMedia(t *testing.T) {
 	})
 
 	t.Run("postsocialmedia required userid", func(t *testing.T) {
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), inp).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Name, inp.SocialMediaURL, inp.ProfileImageURL, int64(0), time.Now(), time.Now()).
 			WillReturnError(errors.New("required userid"))
 		out, err := dbtes.PostSocialMedia(ctx, int64(0), inp)
 		assert.Error(t, err)
@@ -54,8 +55,8 @@ func TestDatabase_PostSocialMedia(t *testing.T) {
 		rows := mock.NewRows([]string{"id", "name", "socialmediaurl", "profileimageurl", "userid", "createdat", "updatedat"}).
 			AddRow(1, "SocialMedia Name", "http://socialmediaurl.com/socialmediaurl.jpg", "http://profileimageurl.com/profileimageurl.jpg", 1, time.Now(), time.Now())
 
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), inp).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Name, inp.SocialMediaURL, inp.ProfileImageURL, int64(1), time.Now(), time.Now()).
 			WillReturnRows(rows)
 		out, err := dbtes.PostSocialMedia(ctx, int64(1), inp)
 		assert.NotNil(t, out)
@@ -86,8 +87,8 @@ func TestDatabase_GetSocialMedias(t *testing.T) {
 	})
 
 	t.Run("getsocialmedias success", func(t *testing.T) {
-		rows := mock.NewRows([]string{"id", "name", "socialmediaurl", "userid", "createdat", "updatedat"}).
-			AddRow(1, "SocialMedia Name", "http://socialmediaurl.com/socialmediaurl.jpg", 1, time.Now(), time.Now())
+		rows := mock.NewRows([]string{"id", "name", "socialmediaurl", "userid", "createdat", "updatedat", "username", "profileimageurl"}).
+			AddRow(1, "SocialMedia Name", "http://socialmediaurl.com/socialmediaurl.jpg", 1, time.Now(), time.Now(), "User Name", "http://profileimageurl/profile.jpg")
 
 		mock.ExpectQuery(qry.String()).WillReturnRows(rows)
 		out, err := dbtes.GetSocialMedias(ctx)
@@ -109,7 +110,7 @@ func TestDatabase_GetSocialMediaByID(t *testing.T) {
 	qry := "select id, name, socialmediaurl, userid, createdat, updatedat from socialmedias where id = @ID"
 	t.Run("getsocialmediabyid database down", func(t *testing.T) {
 		mock.ExpectQuery(qry).
-			WithArgs(int64(1), int64(1)).
+			WithArgs(int64(1)).
 			WillReturnError(errors.New("db down"))
 		out, err := dbtes.GetSocialMediaByID(ctx, int64(1))
 		assert.Error(t, err)
@@ -119,7 +120,7 @@ func TestDatabase_GetSocialMediaByID(t *testing.T) {
 
 	t.Run("getsocialmediabyid required userid", func(t *testing.T) {
 		mock.ExpectQuery(qry).
-			WithArgs(int64(1), int64(0)).
+			WithArgs(int64(0)).
 			WillReturnError(errors.New("required userid"))
 		out, err := dbtes.GetSocialMediaByID(ctx, int64(0))
 		assert.Error(t, err)
@@ -132,7 +133,7 @@ func TestDatabase_GetSocialMediaByID(t *testing.T) {
 			AddRow(1, "SocialMedia Name", "http://socialmediaurl.com/socialmediaurl.jpg", 1, time.Now(), time.Now())
 
 		mock.ExpectQuery(qry).
-			WithArgs(int64(1), int64(1)).
+			WithArgs(int64(1)).
 			WillReturnRows(rows)
 		out, err := dbtes.GetSocialMediaByID(ctx, int64(1))
 		assert.NotNil(t, out)
@@ -157,8 +158,8 @@ func TestDatabase_UpdateSocialMedia(t *testing.T) {
 		ProfileImageURL: "https://profileimageurl.com/profileimageurl.jpg",
 	}
 	t.Run("updatesocialmedia database down", func(t *testing.T) {
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), int64(1), inp).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Name, inp.SocialMediaURL, inp.ProfileImageURL, time.Now(), int64(1), int64(1)).
 			WillReturnError(errors.New("db down"))
 		out, err := dbtes.UpdateSocialMedia(ctx, int64(1), int64(1), inp)
 		assert.Error(t, err)
@@ -167,8 +168,8 @@ func TestDatabase_UpdateSocialMedia(t *testing.T) {
 	})
 
 	t.Run("updatesocialmedia required userid", func(t *testing.T) {
-		mock.ExpectQuery(qry).
-			WithArgs(int64(0), int64(1), inp).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Name, inp.SocialMediaURL, inp.ProfileImageURL, time.Now(), int64(0), int64(1)).
 			WillReturnError(errors.New("required userid"))
 		out, err := dbtes.UpdateSocialMedia(ctx, int64(0), int64(1), inp)
 		assert.Nil(t, out)
@@ -176,8 +177,8 @@ func TestDatabase_UpdateSocialMedia(t *testing.T) {
 	})
 
 	t.Run("updatesocialmedia required id", func(t *testing.T) {
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), int64(0), inp).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Name, inp.SocialMediaURL, inp.ProfileImageURL, time.Now(), int64(1), int64(0)).
 			WillReturnError(errors.New("required id"))
 		out, err := dbtes.UpdateSocialMedia(ctx, int64(1), int64(0), inp)
 		assert.Nil(t, out)
@@ -185,11 +186,11 @@ func TestDatabase_UpdateSocialMedia(t *testing.T) {
 	})
 
 	t.Run("updatesocialmedia success", func(t *testing.T) {
-		rows := mock.NewRows([]string{"id", "name", "socialmediaurl", "userid", "updatedat"}).
-			AddRow(1, "SocialMedia Name", "http://socialmediaurl.com/socialmediaurl.jpg", 1, time.Now())
+		rows := mock.NewRows([]string{"id", "name", "socialmediaurl", "profileimageurl", "userid", "updatedat"}).
+			AddRow(1, "SocialMedia Name", "http://socialmediaurl.com/socialmediaurl.jpg", "http://profileimageurl.com/profileimage.jpg", 1, time.Now())
 
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), int64(1), inp).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Name, inp.SocialMediaURL, inp.ProfileImageURL, time.Now(), int64(1), int64(1)).
 			WillReturnRows(rows)
 		out, err := dbtes.UpdateSocialMedia(ctx, int64(1), int64(1), inp)
 		assert.NotNil(t, out)
@@ -208,39 +209,39 @@ func TestDatabase_DeleteSocialMedia(t *testing.T) {
 	}
 	qry := "delete from socialmedias where id=@id and userid=@userid"
 	t.Run("deletesocialmedia database down", func(t *testing.T) {
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1)).
+		mock.ExpectExec(qry).
+			WithArgs(int64(1), int64(1)).
 			WillReturnError(errors.New("db down"))
-		out, err := dbtes.DeleteSocialMedia(ctx, int64(1), int64(0))
+		out, err := dbtes.DeleteSocialMedia(ctx, int64(1), int64(1))
 		assert.Error(t, err)
-		assert.Nil(t, out)
+		assert.Equal(t, "", out)
 		assert.Equal(t, "db down", err.Error())
 	})
 	t.Run("deletesocialmedia required userid", func(t *testing.T) {
-		mock.ExpectQuery(qry).
+		mock.ExpectExec(qry).
 			WithArgs(int64(0), int64(1)).
 			WillReturnError(errors.New("required userid"))
 		out, err := dbtes.DeleteSocialMedia(ctx, int64(0), int64(1))
 		assert.Error(t, err)
-		assert.Nil(t, out)
+		assert.Equal(t, "", out)
 		assert.Equal(t, "required userid", err.Error())
 	})
 
 	t.Run("deletesocialmedia required id", func(t *testing.T) {
-		mock.ExpectQuery(qry).
+		mock.ExpectExec(qry).
 			WithArgs(int64(1), int64(0)).
 			WillReturnError(errors.New("required id"))
 		out, err := dbtes.DeleteSocialMedia(ctx, int64(1), int64(0))
 		assert.Error(t, err)
-		assert.Nil(t, out)
+		assert.Equal(t, "", out)
 		assert.Equal(t, "required id", err.Error())
 	})
 
 	t.Run("deletesocialmedia success", func(t *testing.T) {
 		mock.ExpectExec(qry).
-			WithArgs(int64(1)).
+			WithArgs(int64(1), int64(1)).
 			WillReturnResult(sqlmock.NewResult(1, 1))
-		out, err := dbtes.DeleteSocialMedia(ctx, int64(1), int64(0))
+		out, err := dbtes.DeleteSocialMedia(ctx, int64(1), int64(1))
 		assert.NotNil(t, out)
 		assert.NoError(t, err)
 	})

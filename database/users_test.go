@@ -81,7 +81,7 @@ func TestDatabase_GetUserByID(t *testing.T) {
 
 	t.Run("getuserbyid required userid", func(t *testing.T) {
 		mock.ExpectQuery(qry).
-			WithArgs(int64(1)).
+			WithArgs(int64(0)).
 			WillReturnError(errors.New("required userid"))
 		out, err := dbtes.GetUserByID(ctx, int64(0))
 		assert.Error(t, err)
@@ -114,7 +114,7 @@ func TestDatabase_UpdateUser(t *testing.T) {
 	qry := "update users set email=@email, username=@username, updatedat=@updatedat where id = @ID; select ID, email, username, age, updatedat from users where id = @ID"
 	t.Run("updateuser database down", func(t *testing.T) {
 		mock.ExpectQuery(regexp.QuoteMeta(qry)).
-			WithArgs(int64(1), "deadapeipit@github.com", "deadapeipit").
+			WithArgs("deadapeipit@github.com", "deadapeipit", time.Now(), int64(1)).
 			WillReturnError(errors.New("db down"))
 		out, err := dbtes.UpdateUser(ctx, int64(1), "deadapeipit@github.com", "deadapeipit")
 		assert.Error(t, err)
@@ -124,9 +124,9 @@ func TestDatabase_UpdateUser(t *testing.T) {
 
 	t.Run("updateuser required userid", func(t *testing.T) {
 		mock.ExpectQuery(regexp.QuoteMeta(qry)).
-			WithArgs(int64(1), "deadapeipit@github.com", "deadapeipit").
+			WithArgs("deadapeipit@github.com", "deadapeipit", time.Now(), int64(0)).
 			WillReturnError(errors.New("required userid"))
-		out, err := dbtes.UpdateUser(ctx, int64(1), "deadapeipit@github.com", "deadapeipit")
+		out, err := dbtes.UpdateUser(ctx, int64(0), "deadapeipit@github.com", "deadapeipit")
 		assert.Error(t, err)
 		assert.Nil(t, out)
 		assert.Equal(t, "required userid", err.Error())
@@ -137,7 +137,7 @@ func TestDatabase_UpdateUser(t *testing.T) {
 			AddRow(1, "deadapeipit", "deadapeipit@github.com", 22, time.Now())
 
 		mock.ExpectQuery(regexp.QuoteMeta(qry)).
-			WithArgs(int64(1), "deadapeipit@github.com", "deadapeipit").
+			WithArgs("deadapeipit@github.com", "deadapeipit", time.Now(), int64(1)).
 			WillReturnRows(rows)
 		out, err := dbtes.UpdateUser(ctx, int64(1), "deadapeipit@github.com", "deadapeipit")
 		assert.NotNil(t, out)
@@ -163,7 +163,7 @@ func TestDatabase_Register(t *testing.T) {
 	qry := "insert into users (username, email, password, age, createdat, updatedat) values (@username, @email, @password, @age, @createdat, @updatedat)"
 	t.Run("register database down", func(t *testing.T) {
 		mock.ExpectQuery(regexp.QuoteMeta(qry)).
-			WithArgs(inp).
+			WithArgs(inp.Username, inp.Email, inp.Password, inp.Age, time.Now(), time.Now()).
 			WillReturnError(errors.New("db down"))
 		out, err := dbtes.Register(ctx, inp)
 		assert.Error(t, err)
@@ -176,7 +176,7 @@ func TestDatabase_Register(t *testing.T) {
 			AddRow(1, "deadapeipit", "deadapeipit@github.com", 22)
 
 		mock.ExpectQuery(regexp.QuoteMeta(qry)).
-			WithArgs(inp).
+			WithArgs(inp.Username, inp.Email, inp.Password, inp.Age, time.Now(), time.Now()).
 			WillReturnRows(rows)
 		out, err := dbtes.Register(ctx, inp)
 		assert.NotNil(t, out)
@@ -200,7 +200,7 @@ func TestDatabase_DeleteUser(t *testing.T) {
 			WillReturnError(errors.New("db down"))
 		out, err := dbtes.DeleteUser(ctx, int64(1))
 		assert.Error(t, err)
-		assert.Nil(t, out)
+		assert.Equal(t, "", out)
 		assert.Equal(t, "db down", err.Error())
 	})
 
@@ -210,7 +210,7 @@ func TestDatabase_DeleteUser(t *testing.T) {
 			WillReturnError(errors.New("required userid"))
 		out, err := dbtes.DeleteUser(ctx, int64(0))
 		assert.Error(t, err)
-		assert.Nil(t, out)
+		assert.Equal(t, "", out)
 		assert.Equal(t, "required userid", err.Error())
 	})
 

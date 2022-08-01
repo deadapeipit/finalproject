@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	server.GetConfig()
+	server.GetConfig("config/config.json")
 
 	connString := server.Config.ConnectionString
 	sql := database.NewSqlConnection(server.DecryptConnectionString(connString))

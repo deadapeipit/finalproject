@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"finalproject/entity"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -31,8 +32,8 @@ func TestDatabase_PostPhoto(t *testing.T) {
 	}
 
 	t.Run("postphoto database down", func(t *testing.T) {
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), inp).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Title, inp.Caption, inp.PhotoUrl, int64(1), time.Now(), time.Now()).
 			WillReturnError(errors.New("db down"))
 		out, err := dbtes.PostPhoto(ctx, int64(1), inp)
 		assert.Error(t, err)
@@ -41,8 +42,8 @@ func TestDatabase_PostPhoto(t *testing.T) {
 	})
 
 	t.Run("postphoto required userid", func(t *testing.T) {
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), inp).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Title, inp.Caption, inp.PhotoUrl, int64(0), time.Now(), time.Now()).
 			WillReturnError(errors.New("required userid"))
 		out, err := dbtes.PostPhoto(ctx, int64(0), inp)
 		assert.Error(t, err)
@@ -54,8 +55,8 @@ func TestDatabase_PostPhoto(t *testing.T) {
 		rows := mock.NewRows([]string{"id", "title", "caption", "photourl", "userid", "createdat"}).
 			AddRow(1, "Foto Kopi", "Foto kopi doang beneran", "http://imageurl.com/fotokopi.jpg", 1, time.Now())
 
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), inp).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Title, inp.Caption, inp.PhotoUrl, int64(1), time.Now(), time.Now()).
 			WillReturnRows(rows)
 		out, err := dbtes.PostPhoto(ctx, int64(1), inp)
 		assert.NotNil(t, out)
@@ -117,7 +118,7 @@ func TestDatabase_GetPhotosByUserID(t *testing.T) {
 
 	t.Run("getphotosbyuserid required userid", func(t *testing.T) {
 		mock.ExpectQuery(qry).
-			WithArgs(int64(1)).
+			WithArgs(int64(0)).
 			WillReturnError(errors.New("required userid"))
 		out, err := dbtes.GetPhotosByUserID(ctx, int64(0))
 		assert.Error(t, err)
@@ -126,8 +127,8 @@ func TestDatabase_GetPhotosByUserID(t *testing.T) {
 	})
 
 	t.Run("getphotosbyuserid success", func(t *testing.T) {
-		rows := mock.NewRows([]string{"id", "title", "caption", "photourl", "userid", "createdat"}).
-			AddRow(1, "Foto Kopi", "Foto kopi doang beneran", "http://imageurl.com/fotokopi.jpg", 1, time.Now())
+		rows := mock.NewRows([]string{"id", "title", "caption", "photourl", "userid", "createdat", "updatedat"}).
+			AddRow(1, "Foto Kopi", "Foto kopi doang beneran", "http://imageurl.com/fotokopi.jpg", 1, time.Now(), time.Now())
 
 		mock.ExpectQuery(qry).
 			WithArgs(int64(1)).
@@ -160,7 +161,7 @@ func TestDatabase_GetPhotoByID(t *testing.T) {
 
 	t.Run("getphotosbyid required id", func(t *testing.T) {
 		mock.ExpectQuery(qry).
-			WithArgs(int64(1)).
+			WithArgs(int64(0)).
 			WillReturnError(errors.New("required id"))
 		out, err := dbtes.GetPhotoByID(ctx, int64(0))
 		assert.Error(t, err)
@@ -198,8 +199,8 @@ func TestDatabase_UpdatePhoto(t *testing.T) {
 	}
 
 	t.Run("updatephoto database down", func(t *testing.T) {
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), int64(1), inp).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Title, inp.Caption, inp.PhotoUrl, time.Now(), int64(1), int64(1)).
 			WillReturnError(errors.New("db down"))
 		out, err := dbtes.UpdatePhoto(ctx, int64(1), int64(1), inp)
 		assert.Error(t, err)
@@ -208,8 +209,8 @@ func TestDatabase_UpdatePhoto(t *testing.T) {
 	})
 
 	t.Run("updatephoto required id", func(t *testing.T) {
-		mock.ExpectQuery(qry).
-			WithArgs(int64(1), int64(0), inp).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Title, inp.Caption, inp.PhotoUrl, time.Now(), int64(1), int64(0)).
 			WillReturnError(errors.New("required id"))
 		out, err := dbtes.UpdatePhoto(ctx, int64(1), int64(0), inp)
 		assert.Error(t, err)
@@ -218,8 +219,8 @@ func TestDatabase_UpdatePhoto(t *testing.T) {
 	})
 
 	t.Run("updatephoto required userid", func(t *testing.T) {
-		mock.ExpectQuery(qry).
-			WithArgs(int64(0), int64(1), inp).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Title, inp.Caption, inp.PhotoUrl, time.Now(), int64(0), int64(1)).
 			WillReturnError(errors.New("required userid"))
 		out, err := dbtes.UpdatePhoto(ctx, int64(0), int64(1), inp)
 		assert.Error(t, err)
@@ -231,8 +232,8 @@ func TestDatabase_UpdatePhoto(t *testing.T) {
 		rows := mock.NewRows([]string{"id", "title", "caption", "photourl", "userid", "updatedat"}).
 			AddRow(1, "Foto Kopi", "Foto kopi doang beneran", "http://imageurl.com/fotokopi.jpg", 1, time.Now())
 
-		mock.ExpectQuery(qry).
-			WithArgs(int64(0), int64(1), inp).
+		mock.ExpectQuery(regexp.QuoteMeta(qry)).
+			WithArgs(inp.Title, inp.Caption, inp.PhotoUrl, time.Now(), int64(1), int64(1)).
 			WillReturnRows(rows)
 		out, err := dbtes.UpdatePhoto(ctx, int64(1), int64(1), inp)
 		assert.NotNil(t, out)
@@ -251,40 +252,40 @@ func TestDatabase_DeletePhoto(t *testing.T) {
 	}
 	qry := "delete from comments where photoid=@id and userid=@userid; delete from photos where id=@id and userid=@userid"
 	t.Run("deletephoto database down", func(t *testing.T) {
-		mock.ExpectQuery(qry).
+		mock.ExpectExec(qry).
 			WithArgs(int64(1), int64(1)).
 			WillReturnError(errors.New("db down"))
 		out, err := dbtes.DeletePhoto(ctx, int64(1), int64(1))
 		assert.Error(t, err)
-		assert.Nil(t, out)
+		assert.Equal(t, "", out)
 		assert.Equal(t, "db down", err.Error())
 	})
 
 	t.Run("deletephoto required userid", func(t *testing.T) {
-		mock.ExpectQuery(qry).
+		mock.ExpectExec(qry).
 			WithArgs(int64(0), int64(1)).
 			WillReturnError(errors.New("required userid"))
 		out, err := dbtes.DeletePhoto(ctx, int64(0), int64(1))
 		assert.Error(t, err)
-		assert.Nil(t, out)
+		assert.Equal(t, "", out)
 		assert.Equal(t, "required userid", err.Error())
 	})
 
 	t.Run("deletephoto required id", func(t *testing.T) {
-		mock.ExpectQuery(qry).
+		mock.ExpectExec(qry).
 			WithArgs(int64(1), int64(0)).
 			WillReturnError(errors.New("required id"))
 		out, err := dbtes.DeletePhoto(ctx, int64(1), int64(0))
 		assert.Error(t, err)
-		assert.Nil(t, out)
+		assert.Equal(t, "", out)
 		assert.Equal(t, "required id", err.Error())
 	})
 
 	t.Run("deletephoto success", func(t *testing.T) {
 		mock.ExpectExec(qry).
-			WithArgs(int64(1)).
+			WithArgs(int64(1), int64(1)).
 			WillReturnResult(sqlmock.NewResult(1, 1))
-		out, err := dbtes.DeletePhoto(ctx, int64(1), int64(0))
+		out, err := dbtes.DeletePhoto(ctx, int64(1), int64(1))
 		assert.NotNil(t, out)
 		assert.NoError(t, err)
 	})
