@@ -7,7 +7,6 @@ import (
 	"finalproject/entity"
 	s "finalproject/server"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -43,12 +42,12 @@ func (h *UserHandler) UsersHandler(w http.ResponseWriter, r *http.Request) {
 		} else if id == "register" {
 			registerUsersHandler(w, r)
 		} else {
-			updateUserHandler(w, r, id)
+			updateUserHandler(w, r)
 		}
 	case http.MethodPut:
-		updateUserHandler(w, r, id)
+		updateUserHandler(w, r)
 	case http.MethodDelete:
-		deleteUserHandler(w, r, id)
+		deleteUserHandler(w, r)
 	default:
 		s.WriteJsonResp(w, s.ErrorNotFound, "PAGE NOT FOUND")
 		return
@@ -147,65 +146,52 @@ func registerUsersHandler(w http.ResponseWriter, r *http.Request) {
 
 // updateUserHandler
 // Method: PUT
-// Example: localhost/users/1
+// Example: localhost/users
 // JSON Body:
 // {
 //		"username": "user1",
 //		"email": "user@email.com"
 // }
-func updateUserHandler(w http.ResponseWriter, r *http.Request, id string) {
+func updateUserHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
+	id := s.LogonUser.ID
 
-	if id != "" { // get by id
-		if idInt, err := strconv.ParseInt(id, 10, 64); err == nil {
-			decoder := json.NewDecoder(r.Body)
-			validate := validator.New()
-			var inp entity.UserUpdate
-			if err := decoder.Decode(&inp); err != nil {
-				s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
-				return
-			}
-			err := validate.Struct(inp)
-			if err != nil {
-				s.WriteJsonResp(w, s.ErrorBadRequest, err.Error())
-				return
-			}
-			if idInt != s.LogonUser.ID {
-				s.WriteJsonResp(w, s.ErrorUnauthorized, "UNAUTHORIZED")
-				return
-			}
-			users, err := database.SqlDatabase.UpdateUser(ctx, idInt, inp.Email, inp.Username)
-			if err != nil {
-				s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
-				return
-			}
-			retVal := users.ToUserUpdateOutput()
-			s.WriteJsonResp(w, s.Success, retVal)
-		}
+	decoder := json.NewDecoder(r.Body)
+	validate := validator.New()
+	var inp entity.UserUpdate
+	if err := decoder.Decode(&inp); err != nil {
+		s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
+		return
 	}
+	err := validate.Struct(inp)
+	if err != nil {
+		s.WriteJsonResp(w, s.ErrorBadRequest, err.Error())
+		return
+	}
+	users, err := database.SqlDatabase.UpdateUser(ctx, id, inp.Email, inp.Username)
+	if err != nil {
+		s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
+		return
+	}
+	retVal := users.ToUserUpdateOutput()
+	s.WriteJsonResp(w, s.Success, retVal)
+
 }
 
 // deleteUserHandler
 // Method: DELETE
-// Example: localhost/users/1
-func deleteUserHandler(w http.ResponseWriter, r *http.Request, id string) {
+// Example: localhost/users
+func deleteUserHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
-	if id != "" {
-		if idInt, err := strconv.ParseInt(id, 10, 64); err == nil {
-			if idInt != s.LogonUser.ID {
-				s.WriteJsonResp(w, s.ErrorUnauthorized, "UNAUTHORIZED")
-				return
-			}
-			users, err := database.SqlDatabase.DeleteUser(ctx, idInt)
-			if err != nil {
-				s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
-				return
-			}
-			retVal := map[string]string{
-				"message": users,
-			}
-			s.WriteJsonResp(w, s.Success, retVal)
-
-		}
+	id := s.LogonUser.ID
+	users, err := database.SqlDatabase.DeleteUser(ctx, id)
+	if err != nil {
+		s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
+		return
 	}
+	retVal := map[string]string{
+		"message": users,
+	}
+	s.WriteJsonResp(w, s.Success, retVal)
+
 }
