@@ -153,6 +153,10 @@ func updateCommentHandler(w http.ResponseWriter, r *http.Request, id string) {
 			validate := validator.New()
 			decoder := json.NewDecoder(r.Body)
 			var inp entity.CommentUpdate
+			if err := decoder.Decode(&inp); err != nil {
+				s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
+				return
+			}
 			err := validate.Struct(inp)
 			if err != nil {
 				s.WriteJsonResp(w, s.ErrorBadRequest, err.Error())
@@ -167,10 +171,7 @@ func updateCommentHandler(w http.ResponseWriter, r *http.Request, id string) {
 				s.WriteJsonResp(w, s.ErrorUnauthorized, "UNAUTHORIZED")
 				return
 			}
-			if err := decoder.Decode(&inp); err != nil {
-				s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
-				return
-			}
+
 			p, err := database.SqlDatabase.UpdateComment(ctx, s.LogonUser.ID, idInt, inp.Message)
 			if err != nil {
 				s.WriteJsonResp(w, s.ErrorDataHandleError, err.Error())
